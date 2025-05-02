@@ -1,11 +1,9 @@
-import { Bloom, DepthOfField, EffectComposer, FXAA, N8AO, SSAO, ToneMapping } from '@react-three/postprocessing'
-import { useThree } from '@react-three/fiber'
-import { useEffect } from 'react'
+import { Bloom, DepthOfField, EffectComposer, FXAA, N8AO, SSAO, ToneMapping, SMAA } from '@react-three/postprocessing'
+import * as THREE from 'three'
 import { useControls } from 'leva'
 
+
 export function PostProcessing() {
-  const { gl } = useThree()
-  
   const n8aoControls = useControls('N8AO', {
     distanceFalloff: { value: 1, min: 0, max: 10 },
     aoRadius: { value: 1, min: 0, max: 10 },
@@ -13,24 +11,25 @@ export function PostProcessing() {
   })
 
   const bloomControls = useControls('Bloom', {
-    luminanceThreshold: { value: 0, min: 0, max: 2 },
-    intensity: { value: 0.3, min: 0, max: 3 },
-    radius: { value: 0.3, min: 0, max: 1 }
+    luminanceThreshold: { value: 0.3, min: 0, max: 2 },
+    intensity: { value: 2, min: 0, max: 3 },
+    radius: { value: 0.2, min: 0, max: 1 }
   })
 
   const dofControls = useControls('Depth of Field', {
-    worldFocusDistance: { value: 2, min: 0, max: 200, step: 0.1 },
-    worldFocusRange: { value: 1, min: 0, max: 200, step: 0.1 },
-    bokehScale: { value: 8, min: 0, max: 20 },
-    blendAlpha: { value: 0.5, min: 0, max: 1, step: 0.1 }
+    focusDistance: { value: 0.2, min: 0, max: 1, step: 0.01 },
+    focalLength: { value: 0.2, min: 0, max: 1, step: 0.01 },
+    bokehScale: { value: 3, min: 0, max: 10 },
   })
 
   return (
-    <EffectComposer disableNormalPass multisampling={8}>
-      <N8AO {...n8aoControls} />
-      <FXAA/>
-      {/* <DepthOfField {...dofControls}/> */}
-      {/* <ToneMapping /> */}
-    </EffectComposer>
+    <>
+      <EffectComposer enableNormalPass={false} multisampling={4}>
+        <Bloom {...bloomControls} />
+        <DepthOfField {...dofControls}/>
+        <N8AO {...n8aoControls} />
+        {/* <ToneMapping /> */}
+      </EffectComposer>
+    </>
   )
 }
