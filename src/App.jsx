@@ -6,6 +6,8 @@ import { useControls } from 'leva';
 import { StrokeCharacter } from './components/StrokeCharacter';
 import { PostProcessing } from './components/PostProcessing';
 import { SceneEnvironment } from './components/SceneEnvironment';
+import Debug from './r3f-gist/utility/Debug';
+import GlobalStates from "./r3f-gist/utility/GlobalStates";
 
 export default function App() {
     const [char, setChar] = useState('駿');
@@ -27,14 +29,20 @@ export default function App() {
         }
     });
 
+    const fogControls = useControls('Fog', {
+        color: '#141622',
+        density: { value: 0.01, min: 0, max: 0.1, step: 0.01 }
+    });
+
     return <>
+        <GlobalStates/>
         <Canvas shadows gl={{ preserveDrawingBuffer: true }}>
             {cameraType === 'perspective' ? (
                 <PerspectiveCamera
                     makeDefault
                     fov={45}
                     near={0.1}
-                    far={200}
+                    far={50}
                     position={[0, 0, position]}
                 />
             ) : (
@@ -46,7 +54,8 @@ export default function App() {
                     position={[0, 0, position]}
                 />
             )}
-            <color attach="background" args={['#141622']} />
+            <color attach="background" args={[fogControls.color]} />
+            <fogExp2 attach="fog" args={[fogControls.color, fogControls.density]} />
 
             <OrbitControls makeDefault />
             <SceneEnvironment />

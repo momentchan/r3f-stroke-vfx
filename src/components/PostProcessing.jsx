@@ -1,4 +1,4 @@
-import { Bloom, EffectComposer, FXAA, N8AO, SSAO, ToneMapping } from '@react-three/postprocessing'
+import { Bloom, DepthOfField, EffectComposer, FXAA, N8AO, SSAO, ToneMapping } from '@react-three/postprocessing'
 import { useThree } from '@react-three/fiber'
 import { useEffect } from 'react'
 import { useControls } from 'leva'
@@ -18,15 +18,18 @@ export function PostProcessing() {
     radius: { value: 0.3, min: 0, max: 1 }
   })
 
-  useEffect(() => {
-    gl.setClearColor('#000000')
-  }, [gl])
+  const dofControls = useControls('Depth of Field', {
+    worldFocusDistance: { value: 2, min: 0, max: 200, step: 0.1 },
+    worldFocusRange: { value: 1, min: 0, max: 200, step: 0.1 },
+    bokehScale: { value: 8, min: 0, max: 20 },
+    blendAlpha: { value: 0.5, min: 0, max: 1, step: 0.1 }
+  })
 
   return (
     <EffectComposer disableNormalPass multisampling={8}>
       <N8AO {...n8aoControls} />
-      {/* <Bloom {...bloomControls} /> */}
       <FXAA/>
+      {/* <DepthOfField {...dofControls}/> */}
       {/* <ToneMapping /> */}
     </EffectComposer>
   )

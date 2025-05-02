@@ -1,4 +1,4 @@
-import { Environment, Lightformer } from "@react-three/drei"
+import { Environment, Lightformer, SpotLight, useDepthBuffer } from "@react-three/drei"
 import { useControls } from 'leva'
 
 export function SceneEnvironment() {
@@ -6,6 +6,7 @@ export function SceneEnvironment() {
         intensity: { value: 1000, min: 0, max: 10000 },
         envResolution: { value: 512, min: 128, max: 512, step: 128 }
     })
+    const depthBuffer = useDepthBuffer({ frames: 1 })
 
     return (
         <>

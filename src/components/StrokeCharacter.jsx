@@ -1,11 +1,15 @@
 import * as THREE from 'three';
 import { SVGLoader } from 'three-stdlib';
 import HanziWriter from 'hanzi-writer';
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useControls } from 'leva';
 import { MeshTransmissionMaterial } from '@react-three/drei';
+import { useFrame, useThree } from '@react-three/fiber';
+import useGlobalStore from '../r3f-gist/utility/useGlobalStore';
 
 export function StrokeCharacter({ char }) {
+    const { isMobile } = useGlobalStore();
+    const { viewport, camera } = useThree();
     const [strokes, setStrokes] = useState([]);
     const [center, setCenter] = useState([0, 0]);
     
@@ -19,25 +23,29 @@ export function StrokeCharacter({ char }) {
         scale: { value: 0.01, min: 0.001, max: 0.1, step: 0.001 }
     });
 
-    const materialControls = useControls('Material', {
-        color: '#ffffff',
-        opacity: { value: 1, min: 0, max: 1 },
-        clearcoat: { value: 1, min: 0, max: 1 },
-        clearcoatRoughness: { value: 0.1, min: 0, max: 1 },
-        transmission: { value: 1, min: 0, max: 1 },
-        thickness: { value: 0.1, min: 0, max: 3 },
-        roughness: { value: 0.1, min: 0, max: 1 },
-        ior: { value: 1.5, min: 1, max: 3 },
-        chromaticAberration: { value: 0.1, min: 0, max: 1 },
-        anisotropy: { value: 0.1, min: 0, max: 1 },
-        anisotropicBlur: { value: 0.1, min: 0, max: 1 },
-        distortion: { value: 0.5, min: 0, max: 1 },
-        distortionScale: { value: 0.5, min: 0.1, max: 1 },
-        temporalDistortion: { value: 0.1, min: 0, max: 1 },
-        samples: { value: 8, min: 1, max: 32, step: 1 },
-        resolution: { value: 512, min: 256, max: 2048, step: 256 },
-        transmissionSampler: true
-    });
+    const materialControls = useControls(
+        'Material',
+        {
+            color: '#1c1c1c',
+            ...(isMobile ? {} : { wireframe: false }), // Only show wireframe control on PC
+            transmission: { value: 1, min: 0, max: 1 },
+            thickness: { value: 0.1, min: 0, max: 3 },
+            roughness: { value: 0.1, min: 0, max: 1 },
+            ior: { value: 1.5, min: 1, max: 3 },
+            chromaticAberration: { value: 0.1, min: 0, max: 1 },
+            samples: { value: isMobile ? 4 : 8, min: 1, max: 32, step: 1 },
+            resolution: { value: isMobile ? 256 : 512, min: 256, max: 2048, step: 256 }
+        },
+        { disabled: isMobile }
+    );
+
+    const frustum = useMemo(() => new THREE.Frustum(), []);
+    const projScreenMatrix = useMemo(() => new THREE.Matrix4(), []);
+
+    // Add random wireframe states for each stroke
+    const randomWireframes = useMemo(() => 
+        Array.from({ length: 100 }, () => Math.random() > 0.5), 
+        []);
 
     useEffect(() => {
       HanziWriter.loadCharacterData(char).then(data => {
@@ -62,63 +70,92 @@ export function StrokeCharacter({ char }) {
         setCenter([-(maxX + minX) / 2, -(maxY + minY) / 2]);
       });
     }, [char]);
-  
-    return (
-      <>
-        {/* <mesh 
-          rotation-x={-Math.PI / 2}
-          position={[0, -2, 0]}
-          receiveShadow
-        >
-          <planeGeometry args={[20, 20]} />
-          <meshStandardMaterial 
-            color="#444444"
-            roughness={1}
-            metalness={0}
-          />
-        </mesh> */}
-        <group scale={[geometryControls.scale, geometryControls.scale, geometryControls.scale]} position={[0, 0, 0]}>
-          {strokes.map((svgPath, index) => {
-            try {
-              const parsed = new SVGLoader().parse(`<path d='${svgPath}' />`);
-              const shapes = parsed.paths[0].toShapes(true);
-              const shape = shapes[0];
 
-              const extrudeSettings = {
+    // Optimize material creation
+    const sharedMaterial = useMemo(() => (
+        <MeshTransmissionMaterial 
+            {...materialControls}
+            wireframe={false}
+            toneMapped={false}
+        />
+    ), [materialControls]);
+
+    // Optimize geometry creation with disposal
+    const geometries = useMemo(() => {
+        const pool = strokes.map(svgPath => {
+            const parsed = new SVGLoader().parse(`<path d='${svgPath}' />`);
+            const shapes = parsed.paths[0].toShapes(true);
+            const geometry = new THREE.ExtrudeGeometry(shapes[0], {
                 depth: geometryControls.depth,
                 bevelEnabled: true,
                 bevelThickness: geometryControls.bevelThickness,
                 bevelSize: geometryControls.bevelSize,
                 bevelSegments: geometryControls.bevelSegments,
                 curveSegments: geometryControls.curveSegments,
-              };
+            });
+            geometry.computeBoundingBox();
+            return geometry;
+        });
 
-              const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-              const dynamicOffset = Math.sin(index * 0.8) * geometryControls.zOffset;
+        return {
+            geometries: pool,
+            dispose: () => pool.forEach(geo => geo.dispose())
+        };
+    }, [strokes, geometryControls]);
 
-              return (
+    // Cleanup
+    useEffect(() => {
+        return () => {
+            geometries.dispose();
+        };
+    }, [geometries]);
+
+    // Memoize dynamic offsets
+    const dynamicOffsets = useMemo(() => 
+        Array.from({ length: strokes.length }, (_, i) => 
+            Math.sin(i * 0.8) * geometryControls.zOffset
+        ), 
+        [strokes.length, geometryControls.zOffset]
+    );
+
+    // Frustum culling check
+    useFrame(() => {
+        projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+        frustum.setFromProjectionMatrix(projScreenMatrix);
+    });
+
+    // Update frustum check
+    const isInView = useCallback((geometry, position) => {
+        if (!geometry.boundingSphere) return true;
+        
+        const sphere = geometry.boundingSphere.clone();
+        sphere.center.set(
+            position[0] * geometryControls.scale,
+            position[1] * geometryControls.scale,
+            position[2] * geometryControls.scale
+        );
+        return frustum.intersectsSphere(sphere);
+    }, [frustum, geometryControls.scale]);
+
+    return (
+        <group scale={[geometryControls.scale, geometryControls.scale, geometryControls.scale]}>
+            {geometries.geometries.map((geometry, index) => (
                 <mesh 
-                  key={index} 
-                  geometry={geometry} 
-                  position={[center[0], center[1], dynamicOffset]}
-                  castShadow
-                  receiveShadow
-                  shadowMapType={THREE.PCFSoftShadowMap}
+                    key={index}
+                    geometry={geometry}
+                    position={[center[0], center[1], dynamicOffsets[index]]}
+                    castShadow
+                    receiveShadow
                 >
-                  <MeshTransmissionMaterial 
-                    {...materialControls}
-                    toneMapped={false}
-                    backside={false}
-                    transparent={true}
-                  />
+                    {isMobile ? sharedMaterial : (
+                        <MeshTransmissionMaterial 
+                            {...materialControls}
+                            wireframe={randomWireframes[index]}
+                            toneMapped={false}
+                        />
+                    )}
                 </mesh>
-              );
-            } catch (err) {
-              console.error(`Error parsing stroke ${index}:`, err);
-              return null;
-            }
-          })}
+            ))}
         </group>
-      </>
     );
 }
