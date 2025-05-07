@@ -9,6 +9,7 @@ import { PostProcessing } from './components/PostProcessing';
 import { SceneEnvironment } from './components/SceneEnvironment';
 import Debug from './r3f-gist/utility/Debug';
 import GlobalStates from "./r3f-gist/utility/GlobalStates";
+import { CharacterInput } from "./components/CharacterInput";
 
 function DebugCameraHelper({ camera }) {
     const helper = useRef();
@@ -32,16 +33,7 @@ export default function App() {
     const mainCamera = useRef();
     const debugCameraRef = useRef();
 
-    const { cameraType, zoom, position } = useControls('Camera', {
-        cameraType: {
-            value: 'perspective',
-            options: ['perspective', 'orthographic']
-        },
-        zoom: {
-            value: 50,
-            min: 10,
-            max: 200,
-        },
+    const { position } = useControls('Camera', {
         position: {
             value: 20,
             min: 1,
@@ -64,27 +56,17 @@ export default function App() {
 
     return <>
         <GlobalStates />
+        <CharacterInput char={char} setChar={setChar} />
         <Canvas shadows gl={{ preserveDrawingBuffer: true, antialias: false }}>
             {/* Main Camera */}
-            {cameraType === 'perspective' ? (
-                <PerspectiveCamera
-                    ref={mainCamera}
-                    makeDefault={!showGizmos}
-                    fov={45}
-                    near={0.1}
-                    far={100}
-                    position={[0, 0, position]}
-                />
-            ) : (
-                <OrthographicCamera
-                    ref={mainCamera}
-                    makeDefault={!showGizmos}
-                    zoom={zoom}
-                    near={0.1}
-                    far={200}
-                    position={[0, 0, position]}
-                />
-            )}
+            <PerspectiveCamera
+                ref={mainCamera}
+                makeDefault={!showGizmos}
+                fov={45}
+                near={0.1}
+                far={100}
+                position={[0, 0, position]}
+            />
 
             {/* Debug Camera */}
             {showGizmos && (

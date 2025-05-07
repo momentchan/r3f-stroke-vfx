@@ -1,17 +1,20 @@
 import * as THREE from 'three';
 import { SVGLoader } from 'three-stdlib';
 import HanziWriter from 'hanzi-writer';
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useControls } from 'leva';
 import { MeshTransmissionMaterial } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import useGlobalStore from '../r3f-gist/utility/useGlobalStore';
+import React from "react";
+import Stroke from './Stroke';
 
 export function StrokeCharacter({ char }) {
   const { isMobile } = useGlobalStore();
   const { viewport, camera } = useThree();
   const [strokes, setStrokes] = useState([]);
   const [center, setCenter] = useState([0, 0]);
+  const [bounds, setBounds] = useState({ min: [0, 0], max: [0, 0] });
 
   const geometryControls = useControls('Geometry', {
     depth: { value: 400, min: 1, max: 500 },
@@ -39,6 +42,10 @@ export function StrokeCharacter({ char }) {
     { disabled: isMobile }
   );
 
+  const { showGizmos } = useControls('Debug', {
+    showGizmos: false,
+  });
+
   const frustum = useMemo(() => new THREE.Frustum(), []);
   const projScreenMatrix = useMemo(() => new THREE.Matrix4(), []);
 
@@ -49,6 +56,7 @@ export function StrokeCharacter({ char }) {
 
   useEffect(() => {
     HanziWriter.loadCharacterData(char).then(data => {
+
       setStrokes(data.strokes);
 
       // Calculate overall bounding box
@@ -67,6 +75,7 @@ export function StrokeCharacter({ char }) {
         maxY = Math.max(maxY, geometry.boundingBox.max.y);
       });
 
+      setBounds({ min: [minX, minY], max: [maxX, maxY] });
       setCenter([-(maxX + minX) / 2, -(maxY + minY) / 2]);
     });
   }, [char]);
@@ -141,22 +150,38 @@ export function StrokeCharacter({ char }) {
 
   return (
     <group scale={[geometryControls.scale, geometryControls.scale, geometryControls.scale]}>
+      { (
+        <>
+          <mesh position={[0, 0, 0]}>
+            <boxGeometry 
+              args={[
+                bounds.max[0] - bounds.min[0], 
+                bounds.max[1] - bounds.min[1], 
+                10
+              ]} 
+            />
+            <meshBasicMaterial color="yellow" wireframe transparent opacity={0.5} />
+          </mesh>
+        </>
+      )}
       {geometries.geometries.map((geometry, index) => (
-        <mesh
+        <Stroke
           key={index}
           geometry={geometry}
-          position={[center[0], center[1], dynamicOffsets[index]]}
-          castShadow
-          receiveShadow
-        >
-          {isMobile ? sharedMaterial : (
+          material={isMobile ? sharedMaterial : (
             <MeshTransmissionMaterial
               {...materialControls}
               wireframe={randomWireframes[index] || materialControls.wireframe}
               toneMapped={false}
             />
           )}
-        </mesh>
+          targetPosition={[center[0], center[1], dynamicOffsets[index]]}
+          center={center}
+          index={index}
+          totalStrokes={strokes.length}
+          castShadow
+          receiveShadow
+        />
       ))}
     </group>
   );
