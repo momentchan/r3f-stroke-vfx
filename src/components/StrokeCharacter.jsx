@@ -3,11 +3,12 @@ import { SVGLoader } from 'three-stdlib';
 import HanziWriter from 'hanzi-writer';
 import { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useControls } from 'leva';
-import { MeshTransmissionMaterial } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import useGlobalStore from '../r3f-gist/utility/useGlobalStore';
 import React from "react";
 import Stroke from './Stroke';
+import ThreeCustomShaderMaterial from 'three-custom-shader-material';
+import strokeVertex from '../shader/stroke.glsl';
 
 export function StrokeCharacter({ char }) {
   const { isMobile } = useGlobalStore();
@@ -30,20 +31,35 @@ export function StrokeCharacter({ char }) {
     'Material',
     {
       color: '#1c1c1c',
-      ...(isMobile ? {} : { wireframe: false }), // Only show wireframe control on PC
-      transmission: { value: 1, min: 0, max: 1 },
-      thickness: { value: 0.1, min: 0, max: 3 },
+      ...(isMobile ? {} : { wireframe: false }),
+      metalness: { value: 0.5, min: 0, max: 1 },
       roughness: { value: 0.1, min: 0, max: 1 },
-      ior: { value: 1.5, min: 1, max: 3 },
-      chromaticAberration: { value: 0.1, min: 0, max: 1 },
-      samples: { value: isMobile ? 4 : 8, min: 1, max: 32, step: 1 },
-      resolution: { value: isMobile ? 256 : 512, min: 256, max: 2048, step: 256 }
+      transmission: { value: 1, min: 0, max: 1 },
+      thickness: { value: 1.5, min: 0, max: 5 },
+      attenuationDistance: { value: 0.5, min: 0, max: 2 },
+      attenuationColor: '#ffffff',
+      clearcoat: { value: 1, min: 0, max: 1 },
+      clearcoatRoughness: { value: 0.1, min: 0, max: 1 },
+      envMapIntensity: { value: 2, min: 0, max: 5 },
+      ior: { value: 1.5, min: 1, max: 2.333 },
+      sheen: { value: 0.1, min: 0, max: 1 },
+      sheenRoughness: { value: 0.3, min: 0, max: 1 },
+      sheenColor: '#ff0000',
+      specularIntensity: { value: 1, min: 0, max: 2 },
+      specularColor: '#ffffff'
     },
     { disabled: isMobile }
   );
 
-  const { showGizmos } = useControls('Debug', {
-    showGizmos: false,
+  const noiseControls = useControls('Noise', {
+    scale: { value: 0.01, min: 0.001, max: 0.1 },
+    strength: { value: 100, min: 0, max: 500 },
+    speed: { value: 0.5, min: 0, max: 2 }
+  });
+
+  const animationControls = useControls('Animation', {
+    duration: { value: 1000, min: 100, max: 5000, step: 100 },
+    delay: { value: 200, min: 0, max: 1000, step: 50 }
   });
 
   const frustum = useMemo(() => new THREE.Frustum(), []);
@@ -53,6 +69,9 @@ export function StrokeCharacter({ char }) {
   const randomWireframes = useMemo(() =>
     Array.from({ length: 100 }, () => Math.random() > 0.5),
     []);
+
+  // Add ref for stroke materials
+  const strokeRefs = useRef([]);
 
   useEffect(() => {
     HanziWriter.loadCharacterData(char).then(data => {
@@ -80,16 +99,26 @@ export function StrokeCharacter({ char }) {
     });
   }, [char]);
 
-  // Optimize material creation
-  const sharedMaterial = useMemo(() => (
-    <MeshTransmissionMaterial
-      {...materialControls}
-      wireframe={false}
-      toneMapped={false}
-      transparent={false}
-      backside={false}
-    />
-  ), [materialControls]);
+  // Create shared materials array for all strokes
+  const sharedMaterials = useMemo(() => 
+    Array.from({ length: 100 }, (_, i) => (
+      <ThreeCustomShaderMaterial
+        key={`shared-material-${i}`}
+        baseMaterial={THREE.MeshPhysicalMaterial}
+        uniforms={{
+          uTime: { value: 0 },
+          uNoiseScale: { value: noiseControls.scale },
+          uNoiseStrength: { value: 1 },
+          uSpeed: { value: noiseControls.speed }
+        }}
+        vertexShader={strokeVertex}
+        {...materialControls}
+        wireframe={randomWireframes[i] || materialControls.wireframe}
+        toneMapped={false}
+        silent
+      />
+    ))
+  , [materialControls, noiseControls, randomWireframes]);
 
   // Optimize geometry creation with disposal
   const geometries = useMemo(() => {
@@ -129,10 +158,15 @@ export function StrokeCharacter({ char }) {
     [strokes.length, geometryControls.zOffset]
   );
 
-  // Frustum culling check
-  useFrame(() => {
+  useFrame((state) => {
     projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
     frustum.setFromProjectionMatrix(projScreenMatrix);
+
+    strokeRefs.current.forEach((ref) => {
+      if (ref?.mesh?.material?.uniforms) {
+        ref.mesh.material.uniforms.uTime.value = state.clock.elapsedTime;
+      }
+    });
   });
 
   // Update frustum check
@@ -150,34 +184,32 @@ export function StrokeCharacter({ char }) {
 
   return (
     <group scale={[geometryControls.scale, geometryControls.scale, geometryControls.scale]}>
-      { (
+      {/* {(
         <>
           <mesh position={[0, 0, 0]}>
-            <boxGeometry 
+            <boxGeometry
               args={[
-                bounds.max[0] - bounds.min[0], 
-                bounds.max[1] - bounds.min[1], 
+                bounds.max[0] - bounds.min[0],
+                bounds.max[1] - bounds.min[1],
                 10
-              ]} 
+              ]}
             />
             <meshBasicMaterial color="yellow" wireframe transparent opacity={0.5} />
           </mesh>
         </>
-      )}
+      )} */}
       {geometries.geometries.map((geometry, index) => (
         <Stroke
           key={index}
+          ref={(el) => (strokeRefs.current[index] = el)}
           geometry={geometry}
-          material={isMobile ? sharedMaterial : (
-            <MeshTransmissionMaterial
-              {...materialControls}
-              wireframe={randomWireframes[index] || materialControls.wireframe}
-              toneMapped={false}
-            />
-          )}
+          material={sharedMaterials[index]}
           targetPosition={[center[0], center[1], dynamicOffsets[index]]}
           center={center}
           index={index}
+          char={char}
+          duration={animationControls.duration}
+          delay={animationControls.delay}
           totalStrokes={strokes.length}
           castShadow
           receiveShadow

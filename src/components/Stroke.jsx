@@ -1,32 +1,70 @@
-import { useState, useEffect } from 'react';
-import { useSpring, animated } from '@react-spring/three';
+import { forwardRef, useImperativeHandle, useRef, useEffect } from 'react';
+import { useSpring } from '@react-spring/three';
 
-export default function Stroke({ geometry, material, targetPosition, center, index, totalStrokes, ...props }) {
-    const [isVisible, setIsVisible] = useState(false);
-    
-    const { position } = useSpring({
-        position: isVisible ? targetPosition : [center[0], center[1], 0],
-        config: { mass: 1, tension: 180, friction: 20 }
-    });
-    
+export default forwardRef(function Stroke({ 
+    geometry, 
+    material, 
+    targetPosition, 
+    index, 
+    char, // Add character prop
+    duration = 1000, 
+    delay = 200, 
+    ...props 
+}, ref) {
+    const meshRef = useRef();
+    const [spring, api] = useSpring(() => ({
+        strength: 1,
+        delay: index * delay,
+        config: {
+            duration: duration,
+            easing: t => t < 0.5 ? 4 * t * t * t : (t - 1) * (2 * t - 2) * (2 * t - 2) + 1 // cubic easing
+        },
+        onChange: ({ value }) => {
+            if (meshRef.current?.material?.uniforms) {
+                meshRef.current.material.uniforms.uNoiseStrength.value = value.strength;
+            }
+        }
+    }));
+
     useEffect(() => {
-        const delay = index * 400;
-        const timer = setTimeout(() => {
-            setIsVisible(true);
-        }, delay);
-        
-        return () => clearTimeout(timer);
-    }, [index]);
+        api.start({ 
+            strength: 0,
+            delay: index * delay,
+            config: { 
+                duration: duration,
+                easing: t => t < 0.5 ? 4 * t * t * t : (t - 1) * (2 * t - 2) * (2 * t - 2) + 1
+            }
+        });
+    }, [duration, delay, index]);
 
-    if (!isVisible) return null;
+    // Reset and retrigger animation when character changes
+    useEffect(() => {
+        api.start({ 
+            strength: 1,
+            immediate: true
+        });
+        api.start({ 
+            strength: 0,
+            delay: index * delay,
+            config: { 
+                duration: duration,
+                easing: t => t < 0.5 ? 4 * t * t * t : (t - 1) * (2 * t - 2) * (2 * t - 2) + 1
+            }
+        });
+    }, [char]); // Watch for character changes
+
+    useImperativeHandle(ref, () => ({
+        mesh: meshRef.current
+    }));
 
     return (
-        <animated.mesh
-            position={position}
-            geometry={geometry} 
+        <mesh
+            ref={meshRef}
+            position={targetPosition}
+            geometry={geometry}
             {...props}
         >
             {material}
-        </animated.mesh>
+        </mesh>
     );
-}
+});
