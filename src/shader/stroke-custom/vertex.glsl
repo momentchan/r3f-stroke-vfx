@@ -1,10 +1,10 @@
-#include "../r3f-gist/shader/cginc/noise/simplexNoise.glsl"
+#include "../../r3f-gist/shader/cginc/noise/simplexNoise.glsl"
 
 uniform float uNoiseScale;
 uniform float uNoiseStrength;
 uniform float uTime;
 uniform float uNoiseStrengthMultiplier;
-
+varying vec2 vUv;
 void main() {
     vec3 noisePos = position * uNoiseScale;
     noisePos.z += uTime * 0.1;
@@ -27,5 +27,6 @@ void main() {
     
     vec3 displaced = position + (normalNoise + tangentNoise + bitangentNoise) * uNoiseStrength * uNoiseStrengthMultiplier;
     
-    csm_Position = displaced;
+    vUv = uv; // Pass UV attribute to the fragment shader
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
 }

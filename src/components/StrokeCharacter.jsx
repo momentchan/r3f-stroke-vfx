@@ -7,10 +7,13 @@ import useGlobalStore from '../r3f-gist/utility/useGlobalStore';
 import React from "react";
 import Stroke from './Stroke';
 import ThreeCustomShaderMaterial from 'three-custom-shader-material';
-import strokeVertex from '../shader/stroke.glsl';
+import transmissionVertex from '../shader/stroke-transmission/vertex.glsl';
+import customVertex from '../shader/stroke-custom/vertex.glsl';
+import customFragment from '../shader/stroke-custom/fragment.glsl';
 import { useCharacterControls } from '../hooks/useCharacterControls';
 import { useStrokeTimings } from '../hooks/useStrokeTimings';
 import { useAnimationTrigger } from '../hooks/useAnimationTrigger';
+import { CustomShaderMaterial } from '../r3f-gist/shader/CustomShaderMaterial';
 
 export function StrokeCharacter({ char }) {
   const { isMobile } = useGlobalStore();
@@ -23,7 +26,8 @@ export function StrokeCharacter({ char }) {
     geometryControls, 
     materialControls, 
     noiseControls, 
-    animationControls 
+    animationControls,
+    shaderControls
   } = useCharacterControls(isMobile);
 
   const strokeTimings = useStrokeTimings(
@@ -68,11 +72,10 @@ export function StrokeCharacter({ char }) {
     });
   }, [char]);
 
-  // Create shared materials array for all strokes
-  const sharedMaterials = useMemo(() => 
-    Array.from({ length: 100 }, (_, i) => (
+  const materialMap = {
+    'default': (i) => (
       <ThreeCustomShaderMaterial
-        key={`shared-material-${i}`}
+        key={`default-material-${i}`}
         baseMaterial={THREE.MeshPhysicalMaterial}
         uniforms={{
           uTime: { value: 0 },
@@ -81,15 +84,40 @@ export function StrokeCharacter({ char }) {
           uNoiseStrengthMultiplier: { value: noiseControls.strength },
           uSpeed: { value: noiseControls.speed }
         }}
-        vertexShader={strokeVertex}
+        vertexShader={transmissionVertex}
         {...materialControls}
         wireframe={randomWireframes[i] || materialControls.wireframe}
         toneMapped={false}
         silent
         side={THREE.DoubleSide}
       />
-    ))
-  , [materialControls, noiseControls, randomWireframes]);
+    ),
+    'dissolve': (i) => (
+      <CustomShaderMaterial
+        key={`dissolve-material-${i}`}
+        uniforms={{
+          uTime: { value: 0 },
+          uNoiseScale: { value: noiseControls.scale },
+          uNoiseStrength: { value: 1 },
+          uNoiseStrengthMultiplier: { value: noiseControls.strength },
+          uSpeed: { value: noiseControls.speed }
+        }}
+        vertexShader={customVertex}
+        fragmentShader={customFragment}
+        materialProps={{
+          ...materialControls,
+          wireframe: randomWireframes[i] || materialControls.wireframe
+        }}
+      />
+    )
+  };
+
+  // Create shared materials array for all strokes
+  const sharedMaterials = useMemo(() => 
+    Array.from({ length: 100 }, (_, i) => 
+      materialMap[shaderControls.type](i)
+    )
+  , [materialControls, noiseControls, randomWireframes, shaderControls.type]);
 
   // Optimize geometry creation with disposal
   const geometries = useMemo(() => {

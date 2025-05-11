@@ -46,5 +46,12 @@ export function useCharacterControls(isMobile) {
     minStrokeDuration: { value: 500, min: 100, max: 2000, step: 100 },
   });
 
-  return { geometryControls, materialControls, noiseControls, animationControls };
+  const shaderControls = useControls('Material Type', {
+    type: {
+      value: 'dissolve',
+      options: ['default', 'dissolve']
+    }
+  });
+
+  return { geometryControls, materialControls, noiseControls, animationControls, shaderControls };
 }
