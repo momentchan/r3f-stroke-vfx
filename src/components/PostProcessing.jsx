@@ -25,7 +25,7 @@ export function PostProcessing() {
   return (
     <>
       <EffectComposer enableNormalPass={false} multisampling={4}>
-        <Bloom {...bloomControls} />
+        {/* <Bloom {...bloomControls} /> */}
         <DepthOfField {...dofControls}/>
         <N8AO {...n8aoControls} />
         {/* <ToneMapping /> */}

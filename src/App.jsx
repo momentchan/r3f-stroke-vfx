@@ -1,4 +1,4 @@
-import { OrbitControls, OrthographicCamera, PerspectiveCamera, GizmoHelper, GizmoViewport } from "@react-three/drei";
+import { PerspectiveCamera, GizmoHelper, GizmoViewport, CameraControls } from "@react-three/drei";
 import * as THREE from 'three';
 import { Canvas } from '@react-three/fiber'
 import Utilities from "./r3f-gist/utility/Utilities";
@@ -10,6 +10,7 @@ import { SceneEnvironment } from './components/SceneEnvironment';
 import Debug from './r3f-gist/utility/Debug';
 import GlobalStates from "./r3f-gist/utility/GlobalStates";
 import { CharacterInput } from "./components/CharacterInput";
+import { AnimateButton } from './components/AnimateButton';
 
 function DebugCameraHelper({ camera }) {
     const helper = useRef();
@@ -57,6 +58,7 @@ export default function App() {
     return <>
         <GlobalStates />
         <CharacterInput char={char} setChar={setChar} />
+        <AnimateButton />
         <Canvas shadows gl={{ preserveDrawingBuffer: true, antialias: false }}>
             {/* Main Camera */}
             <PerspectiveCamera
@@ -83,7 +85,13 @@ export default function App() {
 
             <fogExp2 attach="fog" args={[fogControls.color, fogControls.density]} />
 
-            <OrbitControls makeDefault />
+            <CameraControls 
+                makeDefault 
+                minDistance={5} 
+                maxDistance={30}
+                truckSpeed={0}
+            />
+
             {showGizmos && (
                 <>
                     <GizmoHelper alignment="bottom-right" margin={[80, 80]}>
