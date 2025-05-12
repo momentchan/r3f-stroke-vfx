@@ -1,17 +1,29 @@
 import { forwardRef, useImperativeHandle, useRef, useEffect } from 'react';
 import { useSpring } from '@react-spring/three';
 import { EasingFunctions } from '../r3f-gist/utility/easing';
+import { CustomShaderMaterial } from '../r3f-gist/shader/CustomShaderMaterial';
+import { useControlVariables } from '../hooks/useCharacterVariables';
+import customVertex from '../shader/stroke-custom/vertex.glsl';
+import customFragment from '../shader/stroke-custom/fragment.glsl';
+import * as THREE from 'three';
 
-export default forwardRef(function Stroke({ 
-    geometry, 
-    material, 
-    targetPosition, 
+export default forwardRef(function Stroke({
+    geometry,
+    material,
+    targetPosition,
     index,
     animationTrigger,
-    duration = 1000, 
-    delay = 200, 
-    ...props 
+    duration = 1000,
+    delay = 200,
+    ...props
 }, ref) {
+
+    const {
+        customControls,
+        noiseControls,
+        shaderControls
+    } = useControlVariables(true);
+
     const meshRef = useRef();
     const [spring, api] = useSpring(() => ({
         strength: 0,
@@ -31,10 +43,10 @@ export default forwardRef(function Stroke({
         if (animationTrigger > 0) { // Only run if animationTrigger has changed from initial 0
             const animate = async () => {
                 await api.start({ strength: 1, immediate: true });
-                await api.start({ 
+                await api.start({
                     strength: 0,
                     delay,
-                    config: { 
+                    config: {
                         duration: duration * 1.5,
                         easing: EasingFunctions.easeOutQuint
                     }
@@ -47,8 +59,8 @@ export default forwardRef(function Stroke({
     useImperativeHandle(ref, () => ({
         mesh: meshRef.current,
         reset: () => api.start({ strength: 0, immediate: true }),
-        animate: (dur, del) => api.start({ 
-            strength: 0, 
+        animate: (dur, del) => api.start({
+            strength: 0,
             delay: del,
             config: { duration: dur, easing: EasingFunctions.easeInOutQuint }
         })
@@ -61,7 +73,22 @@ export default forwardRef(function Stroke({
             geometry={geometry}
             {...props}
         >
-            {material}
+            {shaderControls.type === 'dissolve' ?
+                <CustomShaderMaterial
+                    uniforms={{
+                        uNoiseScale: noiseControls.scale,
+                        uNoiseStrength: 1,
+                        uNoiseStrengthMultiplier: noiseControls.strength,
+                        uSpeed: noiseControls.speed,
+                        uAlpha: customControls.alpha,
+                        uTime: 0,
+                    }}
+                    vertexShader={customVertex}
+                    fragmentShader={customFragment}
+                    transparent={true}
+                    side={THREE.DoubleSide}
+                /> :
+                material}
         </mesh>
     );
 });
