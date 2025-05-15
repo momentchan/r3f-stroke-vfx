@@ -25,6 +25,7 @@ export default forwardRef(function Stroke({
     } = useControlVariables(true);
 
     const meshRef = useRef();
+    
     const [spring, api] = useSpring(() => ({
         strength: 0,
         config: {
@@ -73,7 +74,7 @@ export default forwardRef(function Stroke({
             geometry={geometry}
             {...props}
         >
-            {shaderControls.type === 'dissolve' ?
+            {shaderControls.type === 'custom' ?
                 <CustomShaderMaterial
                     uniforms={{
                         uNoiseScale: noiseControls.scale,
@@ -82,11 +83,17 @@ export default forwardRef(function Stroke({
                         uSpeed: noiseControls.speed,
                         uAlpha: customControls.alpha,
                         uTime: 0,
+                        uFresnelColor: new THREE.Color(customControls.fresnelColor),
+                        uFresnelPower: customControls.fresnelPower,
+                        uFogDensity: customControls.fogDensity,
+                        uFogColor: new THREE.Color(customControls.fogColor),
+                        uColor: new THREE.Color(customControls.color),
                     }}
                     vertexShader={customVertex}
                     fragmentShader={customFragment}
                     transparent={true}
                     side={THREE.DoubleSide}
+                    depthWrite={false}
                 /> :
                 material}
         </mesh>

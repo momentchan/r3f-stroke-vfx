@@ -5,6 +5,10 @@ uniform float uNoiseStrength;
 uniform float uTime;
 uniform float uNoiseStrengthMultiplier;
 varying vec2 vUv;
+varying vec3 vViewDirection;
+varying vec3 vNormal;
+varying vec3 vPosition;
+
 void main() {
     vec3 noisePos = position * uNoiseScale;
     noisePos.z += uTime * 0.1;
@@ -27,6 +31,11 @@ void main() {
     
     vec3 displaced = position + (normalNoise + tangentNoise + bitangentNoise) * uNoiseStrength * uNoiseStrengthMultiplier;
     
+    vec4 worldPosition = modelMatrix * vec4(displaced, 1.0);
+    vViewDirection = normalize(cameraPosition - worldPosition.xyz);
+    vNormal = normalMatrix * normal;
+    
     vUv = uv; // Pass UV attribute to the fragment shader
+    vPosition = position;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(displaced, 1.0);
 }

@@ -24,29 +24,77 @@ export function useControlVariables() {
 
   const shaderControls = useControls('Material Type', {
     type: {
-      value: 'dissolve',
-      options: ['default', 'dissolve']
+      value: 'custom',
+      options: ['default', 'custom']
     }
   }, { order: 1 });
 
-  const transmissionControls = useControls('Transmission Material', {
-    color: '#1c1c1c',
-    wireframe: { value: false },
-    metalness: { value: 0.5, min: 0, max: 1 },
-    roughness: { value: 0.1, min: 0, max: 1 },
-    transmission: { value: 1, min: 0, max: 1 },
-    thickness: { value: 1.5, min: 0, max: 5 },
-    ior: { value: 1.5, min: 1, max: 2.333 },
-  }, { collapsed: true, order: 2 });
-
+  const transmissionControls = useControls(
+    'Transmission Material',
+    {
+      color: '#1c1c1c',
+      wireframe: { value: false },
+      metalness: { value: 0.5, min: 0, max: 1 },
+      roughness: { value: 0.1, min: 0, max: 1 },
+      transmission: { value: 1, min: 0, max: 1 },
+      thickness: { value: 1.5, min: 0, max: 5 },
+      attenuationDistance: { value: 0.5, min: 0, max: 2 },
+      attenuationColor: '#ffffff',
+      clearcoat: { value: 1, min: 0, max: 1 },
+      clearcoatRoughness: { value: 0.1, min: 0, max: 1 },
+      envMapIntensity: { value: 2, min: 0, max: 5 },
+      ior: { value: 1.5, min: 1, max: 2.333 },
+      sheen: { value: 0.1, min: 0, max: 1 },
+      sheenRoughness: { value: 0.3, min: 0, max: 1 },
+      sheenColor: '#ff0000',
+      specularIntensity: { value: 1, min: 0, max: 2 },
+      specularColor: '#ffffff'
+    },
+    {
+      order: 2,
+      render: (get) => get('Material Type.type') === 'default'
+    }
+  );
 
   const customControls = useControls('Custom Material', {
+    alpha: { value: 0.5, min: 0, max: 1, step: 0.01 },
     color: '#ffffff',
-    emissive: '#000000',
-    alpha: { value: 0.5, min: 0, max: 1, step: 0.01 }
-  }, { collapsed: false, order: 2 });
+    fresnelColor: '#ffffff',
+    fogColor: '#00839d',
+    fresnelPower: { value: 2, min: 0, max: 5, step: 0.1 },
+    fogDensity: { value: 0.003, min: 0, max: 0.01, step: 0.001 },
+  }, {
+    order: 2,
+    render: (get) => get('Material Type.type') === 'custom'
+  });
+
+
+  const n8aoControls = useControls('N8AO', {
+    distanceFalloff: { value: 1, min: 0, max: 10 },
+    aoRadius: { value: 1, min: 0, max: 10 },
+    intensity: { value: 4, min: 0, max: 10 }
+  }, {
+    order: 2,
+    render: (get) => get('Material Type.type') === 'default'
+  }
+  )
+
+  const bloomControls = useControls('Bloom', {
+    luminanceThreshold: { value: 0.3, min: 0, max: 2 },
+    intensity: { value: .5, min: 0, max: 3 },
+    radius: { value: 0.2, min: 0, max: 1 }
+  })
+
+  const dofControls = useControls('Depth of Field', {
+    focusDistance: { value: 0.2, min: 0, max: 1, step: 0.01 },
+    focalLength: { value: 0.2, min: 0, max: 1, step: 0.01 },
+    bokehScale: { value: 3, min: 0, max: 10 },
+  })
 
   return {
+    n8aoControls,
+    bloomControls,
+    dofControls,
     geometryControls,
     noiseControls,
     animationControls,
